@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Manx Tidal Streams</title>
+<style>
+:root{
+  --sea:#eaf1f4; --sea-deep:#dce8ed; --land:#e6dcae; --land-edge:#8a7d4e;
+  --ink:#16242c; --ink-2:#4a626e; --ink-3:#8ba1ad;
+  --mag:#b0186f; --mag-soft:#e7c3d8; --cool:#5d8496;
+  --rule:#c3d4dc; --paper:#f7fafb; --warn:#a8620d;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--sea);color:var(--ink);font-family:var(--sans);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+
+/* ---------- header ---------- */
+header{
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding:9px 16px;background:var(--paper);border-bottom:1px solid var(--rule);
+}
+h1{
+  margin:0;font-size:13px;font-weight:650;letter-spacing:.22em;text-transform:uppercase;
+}
+h1 span{color:var(--mag)}
+.sub{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.tabs{margin-left:auto;display:flex;gap:2px}
+.tabs button{
+  background:none;border:1px solid transparent;border-radius:2px;padding:5px 13px;
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);
+}
+.tabs button:hover{background:var(--sea)}
+.tabs button[aria-selected=true]{background:var(--ink);color:var(--paper)}
+
+/* ---------- frame strip ---------- */
+.strip{
+  display:flex;align-items:stretch;background:var(--paper);
+  border-bottom:1px solid var(--rule);overflow-x:auto;scrollbar-width:thin;
+}
+.strip button{
+  flex:1 0 auto;min-width:60px;background:none;border:0;border-right:1px solid var(--rule);
+  padding:6px 4px 5px;text-align:center;position:relative;
+}
+.strip button:last-child{border-right:0}
+.strip b{display:block;font:600 12px/1.1 var(--mono);letter-spacing:.02em}
+.strip i{display:block;font-style:normal;font-size:9px;letter-spacing:.08em;color:var(--ink-3);margin-top:2px}
+.strip button[aria-current=true]{background:var(--ink);color:var(--paper)}
+.strip button[aria-current=true] i{color:var(--mag-soft)}
+.strip button:hover:not([aria-current=true]){background:var(--sea)}
+.strip .bar{position:absolute;left:0;bottom:0;height:2px;background:var(--mag)}
+
+/* ---------- layout ---------- */
+main{flex:1;display:flex;min-height:0}
+.pane{min-width:0;min-height:0;display:flex;flex-direction:column}
+#scanPane{flex:0 0 34%;border-right:1px solid var(--rule);background:#e2e9ec}
+#mapPane{flex:1}
+.paneHead{
+  display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--paper);
+  border-bottom:1px solid var(--rule);font-size:10px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.paneHead .push{margin-left:auto;display:flex;gap:4px}
+.mini{
+  background:var(--sea);border:1px solid var(--rule);border-radius:2px;padding:2px 8px;
+  font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);
+}
+.mini:hover{background:#fff;border-color:var(--ink-3)}
+.mini.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+
+#scanWrap{flex:1;overflow:hidden;position:relative;cursor:grab;background:#dfe6e9}
+#scanWrap.drag{cursor:grabbing}
+#scanImg{position:absolute;transform-origin:0 0;image-rendering:auto;user-select:none;-webkit-user-drag:none}
+#mapWrap{flex:1;position:relative;overflow:hidden}
+svg{display:block;width:100%;height:100%;touch-action:none}
+
+/* ---------- map ink ---------- */
+.sea-fill{fill:var(--sea)}
+.grid{stroke:#b9cdd6;fill:none}
+.grid-lab{fill:var(--ink-3);font-family:var(--mono);letter-spacing:.04em}
+.coast{fill:var(--land);stroke:var(--land-edge);stroke-linejoin:round}
+.place{fill:var(--ink-2);font-family:var(--sans);letter-spacing:.16em;text-transform:uppercase}
+.place.sea{fill:#7d99a6;font-style:italic;letter-spacing:.22em}
+.place-dot{fill:var(--ink-2)}
+.stn{fill:#fff;stroke:var(--ink-3)}
+.stn.has{fill:var(--mag-soft);stroke:var(--mag)}
+.stn.sel{stroke:var(--ink)}
+.stn-lab{fill:var(--ink-3);font-family:var(--mono)}
+.arrow{stroke-linecap:round;fill:none}
+.arrow-head{stroke:none}
+.qmark{fill:none}
+.rose circle{fill:none;stroke:var(--ink-3)}
+.rose line{stroke:var(--ink-3)}
+.rose text{fill:var(--ink-2);font-family:var(--mono)}
+
+/* ---------- entry bar ---------- */
+.entry{
+  background:var(--paper);border-top:1px solid var(--rule);padding:8px 12px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.fld{display:flex;flex-direction:column;gap:3px}
+.fld label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.fld input,.fld select{
+  background:#fff;border:1px solid var(--rule);border-radius:2px;padding:4px 7px;
+  font-family:var(--mono);font-size:13px;width:76px;
+}
+.fld input.est{color:var(--warn);font-style:italic;background:#fffaf0}
+.fld input:focus,.fld select:focus{outline:2px solid var(--mag);outline-offset:-1px;border-color:var(--mag)}
+.fld.wide input{width:120px}
+.entry .act{display:flex;gap:6px;margin-left:auto;align-items:center}
+.btn{
+  background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:2px;
+  padding:6px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+}
+.btn:hover{background:#000}
+.btn.ghost-b{background:none;color:var(--ink-2);border-color:var(--rule)}
+.btn.ghost-b:hover{background:var(--sea);color:var(--ink)}
+.btn.mag{background:var(--mag);border-color:var(--mag)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.hint{font-size:11px;color:var(--ink-3);line-height:1.5;max-width:44ch}
+kbd{
+  font:600 10px var(--mono);background:var(--sea);border:1px solid var(--rule);
+  border-bottom-width:2px;border-radius:3px;padding:1px 4px;color:var(--ink-2);
+}
+.caption{
+  padding:7px 12px;background:#fffdf5;border-top:1px solid var(--rule);
+  font-size:11px;line-height:1.5;color:var(--ink-2);
+}
+.caption b{color:var(--mag);font-weight:600;letter-spacing:.1em;text-transform:uppercase;font-size:10px}
+
+/* ---------- play ---------- */
+#playPane{display:none;flex:1;flex-direction:column;min-height:0}
+body.mode-play main{display:none}
+body.mode-play #playPane{display:flex}
+body.mode-play .strip{display:none}
+.transport{
+  background:var(--paper);border-top:1px solid var(--rule);padding:10px 16px;
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+}
+.clock{font:600 26px/1 var(--mono);letter-spacing:-.01em;min-width:132px}
+.clock small{display:block;font:400 9px/1.6 var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.scrub{flex:1;min-width:220px;display:flex;flex-direction:column;gap:4px}
+input[type=range]{width:100%;accent-color:var(--mag)}
+.ticks{display:flex;justify-content:space-between;font:9px var(--mono);color:var(--ink-3)}
+.mapctl{position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:3px}
+.mapctl .mini{background:rgba(247,250,251,.94);min-width:30px}
+#mapWrap,#playWrap,#scanWrap{touch-action:none}
+.legend{
+  position:absolute;right:12px;bottom:12px;background:rgba(247,250,251,.94);
+  border:1px solid var(--rule);border-radius:2px;padding:8px 10px;font-size:10px;
+  color:var(--ink-2);line-height:1.6;pointer-events:none;
+}
+.legend b{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+
+/* ---------- misc ---------- */
+.bar-note{padding:6px 16px;background:#fff6e6;border-bottom:1px solid #eddcbe;font-size:11px;color:var(--warn)}
+dialog{border:1px solid var(--ink);border-radius:3px;padding:0;max-width:640px;width:92%;background:var(--paper)}
+dialog::backdrop{background:rgba(22,36,44,.55)}
+.dlg-h{padding:12px 16px;border-bottom:1px solid var(--rule);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
+.dlg-b{padding:16px;font-size:13px;line-height:1.65;max-height:60vh;overflow:auto}
+.dlg-b h4{margin:14px 0 4px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mag)}
+.dlg-b p{margin:0 0 6px}
+.dlg-f{padding:10px 16px;border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:flex-end}
+textarea{width:100%;height:180px;font:11px/1.5 var(--mono);border:1px solid var(--rule);border-radius:2px;padding:8px}
+:focus-visible{outline:2px solid var(--mag);outline-offset:1px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (max-width:820px){
+  main{flex-direction:column}
+  #scanPane{flex:0 0 42%;border-right:0;border-bottom:1px solid var(--rule)}
+  .hint{display:none}
+}
+</style>
+</head>
+<body class="mode-stations">
+
+<header>
+  <h1>Isle of Man <span>Tidal Streams</span></h1>
+  <div class="sub">Times refer to HW Liverpool</div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-mode="stations" aria-selected="true">Stations</button>
+    <button role="tab" data-mode="values" aria-selected="false">Values</button>
+    <button role="tab" data-mode="play" aria-selected="false">Play</button>
+  </div>
+  <div class="tabs">
+    <button class="mini" id="btnNotes">Notes</button>
+    <button class="mini" id="btnData">Data</button>
+  </div>
+</header>
+
+<div class="strip" id="strip"></div>
+
+<main>
+  <section class="pane" id="scanPane">
+    <div class="paneHead">
+      <span id="scanTitle">Source chart</span>
+      <span class="push">
+        <button class="mini" data-zoom="-1">&minus;</button>
+        <button class="mini" data-zoom="1">+</button>
+        <button class="mini" data-zoom="0">Fit</button>
+      </span>
+    </div>
+    <div id="scanWrap"><img id="scanImg" loading="eager" alt="Source tidal stream chart for the selected hour"></div>
+  </section>
+
+  <section class="pane" id="mapPane">
+    <div class="paneHead">
+      <span id="mapTitle">Chart</span>
+      <span class="push">
+        <button class="mini" id="btnLabels">Labels</button>
+        <button class="mini" id="btnPrevFrame">Copy prev hour</button>
+        <button class="mini" data-mzoom="-1">&minus;</button><button class="mini" data-mzoom="1">+</button><button class="mini" data-mzoom="0">Fit</button>
+      </span>
+    </div>
+    <div id="mapWrap"><svg id="map"></svg></div>
+    <div class="entry" id="entryBar"></div>
+    <div class="caption" id="caption"></div>
+  </section>
+</main>
+
+<section id="playPane">
+  <div id="playWrap" style="flex:1;position:relative;min-height:0">
+    <svg id="pmap"></svg>
+    <div class="mapctl">
+      <button class="mini" data-pzoom="1">+</button>
+      <button class="mini" data-pzoom="-1">&minus;</button>
+      <button class="mini" data-pzoom="0">Fit</button>
+    </div>
+    <div class="legend">
+      <b>Rate &middot; knots</b>
+      <svg width="152" height="60" aria-hidden="true"><g id="legendG"></g></svg>
+    </div>
+  </div>
+  <div class="transport">
+    <div class="clock"><span id="clkT">HW +0:00</span><small id="clkReal">set HW time below</small></div>
+    <button class="btn mag" id="btnPlay">Play</button>
+    <button class="btn ghost-b" id="btnDir">Reverse</button>
+    <div class="scrub">
+      <input type="range" id="scrub" min="-360" max="360" value="0" step="1" aria-label="Hours from high water">
+      <div class="ticks"><span>&minus;6</span><span>&minus;4</span><span>&minus;2</span><span>HW</span><span>+2</span><span>+4</span><span>+6</span></div>
+    </div>
+    <div class="fld"><label for="spring">Springs &harr; neaps</label>
+      <input type="range" id="spring" min="0" max="100" value="100" style="width:120px" aria-label="Spring to neap blend"></div>
+    <div class="fld wide"><label for="hwTime">HW Liverpool</label><input type="datetime-local" id="hwTime"></div>
+    <div class="fld"><label for="speed">Speed</label>
+      <select id="speed"><option value="0.25">¼×</option><option value="0.5">½×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></div>
+  </div>
+</section>
+
+<dialog id="dlgNotes"><div class="dlg-h">Chart notes &mdash; local streams</div><div class="dlg-b" id="notesBody"></div><div class="dlg-f"><button class="btn" onclick="dlgNotes.close()">Close</button></div></dialog>
+
+<dialog id="dlgData"><div class="dlg-h">Data</div>
+  <div class="dlg-b">
+    <p id="dataStats" style="font-family:var(--mono);font-size:12px"></p>
+    <p style="color:var(--ink-3);font-size:11px">Paste a previously exported file below and choose Load, or download what you have so far. Work is kept in this browser session only &mdash; download before you close the tab.</p>
+    <textarea id="dataBox" spellcheck="false"></textarea>
+  </div>
+  <div class="dlg-f">
+    <button class="btn ghost-b" id="btnLoad">Load from box</button>
+    <button class="btn ghost-b" id="btnFill">Show current</button>
+    <button class="btn" id="btnDownload">Download JSON</button>
+    <button class="btn ghost-b" onclick="dlgData.close()">Close</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+const SCANS = {
+"-6": "panels/hw-06.jpg",
+"-5": "panels/hw-05.jpg",
+"-4": "panels/hw-04.jpg",
+"-3": "panels/hw-03.jpg",
+"-2": "panels/hw-02.jpg",
+"-1": "panels/hw-01.jpg",
+"+0": "panels/hw+00.jpg",
+"+1": "panels/hw+01.jpg",
+"+2": "panels/hw+02.jpg",
+"+3": "panels/hw+03.jpg",
+"+4": "panels/hw+04.jpg",
+"+5": "panels/hw+05.jpg",
+"+6": "panels/hw+06.jpg"
+};
+
+/* ============================ constants ============================ */
+const HOURS = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
+const hKey = h => (h<0?"-":"+") + String(Math.abs(h));
+const hLab = h => "HW" + (h<0?"\u2212":"+") + Math.abs(h);
+
+const COAST = [[[-4.79755, 54.05994], [-4.79758, 54.06244], [-4.79417, 54.06411], [-4.79422, 54.06575], [-4.79336, 54.06616], [-4.79173, 54.06619], [-4.78917, 54.06741], [-4.78917, 54.06995], [-4.78756, 54.07076], [-4.7875, 54.07161], [-4.78503, 54.07286], [-4.78336, 54.07289], [-4.77758, 54.07574], [-4.77753, 54.07661], [-4.77419, 54.07828], [-4.77417, 54.07992], [-4.77255, 54.08081], [-4.77253, 54.08247], [-4.77006, 54.08369], [-4.76336, 54.08366], [-4.76089, 54.08492], [-4.76086, 54.08664], [-4.76334, 54.08783], [-4.7717, 54.08783], [-4.77336, 54.08867], [-4.77834, 54.08872], [-4.77922, 54.08908], [-4.77917, 54.09492], [-4.77583, 54.09661], [-4.7758, 54.09828], [-4.7725, 54.09991], [-4.77255, 54.10164], [-4.76922, 54.10328], [-4.76928, 54.10408], [-4.76669, 54.10539], [-4.76505, 54.10533], [-4.76172, 54.10699], [-4.75336, 54.10706], [-4.75259, 54.10661], [-4.75253, 54.10575], [-4.75175, 54.10536], [-4.75089, 54.10577], [-4.75086, 54.10744], [-4.74925, 54.10825], [-4.74922, 54.11494], [-4.74589, 54.11658], [-4.74594, 54.11745], [-4.74422, 54.11826], [-4.74422, 54.11992], [-4.74258, 54.1208], [-4.74261, 54.12161], [-4.74175, 54.122], [-4.74, 54.12202], [-4.73925, 54.12244], [-4.7392, 54.12325], [-4.73586, 54.12494], [-4.73753, 54.12578], [-4.73753, 54.12994], [-4.73589, 54.13078], [-4.73586, 54.13242], [-4.73256, 54.13414], [-4.73253, 54.13577], [-4.73092, 54.13661], [-4.73092, 54.14078], [-4.73425, 54.14244], [-4.73422, 54.14661], [-4.73261, 54.14742], [-4.73256, 54.15325], [-4.73417, 54.15408], [-4.73419, 54.15495], [-4.73589, 54.15578], [-4.73586, 54.15742], [-4.73753, 54.15825], [-4.73758, 54.15911], [-4.74253, 54.16161], [-4.74261, 54.16328], [-4.74089, 54.16408], [-4.74247, 54.16492], [-4.74255, 54.16914], [-4.74086, 54.16992], [-4.74092, 54.17162], [-4.735, 54.17456], [-4.73336, 54.17453], [-4.72925, 54.17658], [-4.72919, 54.17744], [-4.72586, 54.17914], [-4.72589, 54.17995], [-4.72417, 54.18078], [-4.72422, 54.18164], [-4.7225, 54.18245], [-4.72253, 54.1833], [-4.72081, 54.18414], [-4.72089, 54.18831], [-4.71917, 54.18911], [-4.71925, 54.1983], [-4.71756, 54.19914], [-4.71761, 54.19997], [-4.71586, 54.20074], [-4.71586, 54.20325], [-4.71925, 54.20492], [-4.71919, 54.20831], [-4.72089, 54.20914], [-4.72003, 54.20953], [-4.71836, 54.20956], [-4.71589, 54.21081], [-4.71584, 54.21167], [-4.7142, 54.21242], [-4.71416, 54.21414], [-4.71255, 54.21494], [-4.71252, 54.21661], [-4.71089, 54.21745], [-4.71083, 54.21828], [-4.70589, 54.22075], [-4.70592, 54.22161], [-4.70509, 54.22203], [-4.70339, 54.22206], [-4.70253, 54.22244], [-4.70253, 54.22491], [-4.70169, 54.22539], [-4.69836, 54.22536], [-4.69759, 54.22491], [-4.69753, 54.22414], [-4.69675, 54.22369], [-4.69342, 54.22366], [-4.69178, 54.22283], [-4.68678, 54.22536], [-4.68503, 54.22539], [-4.68425, 54.22581], [-4.68586, 54.22664], [-4.68336, 54.22786], [-4.68172, 54.22789], [-4.68, 54.22872], [-4.67847, 54.22867], [-4.67672, 54.22955], [-4.67506, 54.22952], [-4.67333, 54.23042], [-4.67003, 54.23033], [-4.66505, 54.23286], [-4.66341, 54.23289], [-4.65919, 54.23494], [-4.65919, 54.23744], [-4.65598, 54.23908], [-4.65589, 54.23994], [-4.65342, 54.24117], [-4.65175, 54.2412], [-4.65089, 54.24161], [-4.65092, 54.24242], [-4.64922, 54.2433], [-4.64925, 54.24408], [-4.64753, 54.24497], [-4.64755, 54.24577], [-4.64086, 54.24911], [-4.64089, 54.24992], [-4.63086, 54.25497], [-4.63089, 54.25581], [-4.62431, 54.25911], [-4.62422, 54.25995], [-4.62261, 54.26077], [-4.62258, 54.26244], [-4.61922, 54.26414], [-4.61925, 54.26494], [-4.60922, 54.26997], [-4.60925, 54.27078], [-4.60753, 54.27158], [-4.60756, 54.27245], [-4.60594, 54.27328], [-4.60592, 54.275], [-4.60428, 54.27575], [-4.60423, 54.27661], [-4.60258, 54.27742], [-4.60253, 54.27827], [-4.59917, 54.27992], [-4.5992, 54.28078], [-4.59758, 54.28162], [-4.59756, 54.28331], [-4.59592, 54.28409], [-4.59586, 54.28494], [-4.59422, 54.28575], [-4.59422, 54.28828], [-4.5925, 54.28908], [-4.59256, 54.2908], [-4.59084, 54.29161], [-4.59092, 54.29327], [-4.5892, 54.29411], [-4.58928, 54.29662], [-4.58755, 54.2975], [-4.58759, 54.29828], [-4.58586, 54.29911], [-4.58755, 54.29994], [-4.58759, 54.3008], [-4.58586, 54.30161], [-4.58591, 54.30328], [-4.5842, 54.30408], [-4.58427, 54.3058], [-4.58256, 54.30664], [-4.58261, 54.30827], [-4.58089, 54.30917], [-4.58095, 54.31075], [-4.57922, 54.31164], [-4.57928, 54.31331], [-4.57755, 54.31411], [-4.57758, 54.31497], [-4.57586, 54.31581], [-4.57589, 54.31664], [-4.57428, 54.31747], [-4.57422, 54.31911], [-4.57261, 54.31995], [-4.57253, 54.3208], [-4.57092, 54.32161], [-4.57095, 54.32247], [-4.56922, 54.3233], [-4.56925, 54.32408], [-4.56753, 54.32497], [-4.56756, 54.32578], [-4.56592, 54.32664], [-4.56586, 54.32744], [-4.56422, 54.32828], [-4.56425, 54.32914], [-4.56091, 54.33083], [-4.56094, 54.33163], [-4.55922, 54.33244], [-4.55922, 54.33495], [-4.55759, 54.33578], [-4.5575, 54.33914], [-4.55589, 54.33997], [-4.55592, 54.34328], [-4.55428, 54.34409], [-4.55428, 54.34666], [-4.55264, 54.34741], [-4.55258, 54.35081], [-4.55086, 54.35161], [-4.55092, 54.35328], [-4.54919, 54.35414], [-4.54922, 54.35494], [-4.54758, 54.35583], [-4.54753, 54.35664], [-4.54589, 54.35744], [-4.54591, 54.35831], [-4.5443, 54.35912], [-4.54422, 54.35997], [-4.54258, 54.36081], [-4.54264, 54.36161], [-4.53928, 54.3633], [-4.53931, 54.36414], [-4.53594, 54.36578], [-4.53589, 54.36664], [-4.52589, 54.37164], [-4.52592, 54.37242], [-4.52341, 54.37372], [-4.52177, 54.37367], [-4.52092, 54.37414], [-4.52094, 54.375], [-4.52006, 54.37537], [-4.51842, 54.37537], [-4.51678, 54.37619], [-4.51511, 54.37622], [-4.51175, 54.37791], [-4.51009, 54.37788], [-4.49175, 54.38705], [-4.49008, 54.38702], [-4.48672, 54.38867], [-4.48505, 54.38869], [-4.47845, 54.39203], [-4.47678, 54.39206], [-4.47514, 54.39286], [-4.47339, 54.39288], [-4.46675, 54.39622], [-4.46508, 54.39626], [-4.46008, 54.3987], [-4.45675, 54.39873], [-4.45514, 54.39955], [-4.44672, 54.39955], [-4.44508, 54.40036], [-4.43678, 54.40039], [-4.43503, 54.40122], [-4.43347, 54.40125], [-4.43175, 54.40205], [-4.42675, 54.40205], [-4.42511, 54.40289], [-4.42336, 54.40289], [-4.42181, 54.40372], [-4.4185, 54.40369], [-4.41675, 54.40453], [-4.41508, 54.40453], [-4.41183, 54.40617], [-4.41006, 54.40619], [-4.40842, 54.40703], [-4.40678, 54.40703], [-4.40514, 54.40791], [-4.40347, 54.40786], [-4.40175, 54.40869], [-4.40017, 54.40872], [-4.39845, 54.40953], [-4.39677, 54.40956], [-4.3935, 54.41119], [-4.39175, 54.41119], [-4.39011, 54.41203], [-4.38844, 54.41203], [-4.3868, 54.41292], [-4.38514, 54.41289], [-4.38342, 54.4137], [-4.38175, 54.41373], [-4.38011, 54.41453], [-4.37511, 54.41453], [-4.3735, 54.41536], [-4.37016, 54.41539], [-4.36842, 54.4162], [-4.36344, 54.4162], [-4.36095, 54.41497], [-4.36092, 54.38747], [-4.36256, 54.38667], [-4.36258, 54.38495], [-4.36422, 54.38411], [-4.3643, 54.38081], [-4.36597, 54.37994], [-4.36592, 54.37578], [-4.36764, 54.37494], [-4.36761, 54.37417], [-4.36925, 54.37328], [-4.36928, 54.37161], [-4.37092, 54.37075], [-4.37092, 54.36745], [-4.37264, 54.36661], [-4.37258, 54.36497], [-4.37431, 54.36414], [-4.37425, 54.36244], [-4.37603, 54.36161], [-4.37595, 54.35997], [-4.37767, 54.35914], [-4.37759, 54.35664], [-4.3793, 54.35575], [-4.3793, 54.35245], [-4.38094, 54.35164], [-4.38094, 54.34581], [-4.38255, 54.34494], [-4.38264, 54.33244], [-4.38094, 54.33158], [-4.381, 54.32742], [-4.3793, 54.32658], [-4.37922, 54.32408], [-4.37764, 54.32325], [-4.37759, 54.32164], [-4.37589, 54.3208], [-4.37592, 54.31831], [-4.37253, 54.31661], [-4.37258, 54.31492], [-4.36922, 54.31331], [-4.36928, 54.3125], [-4.36847, 54.31206], [-4.36672, 54.312], [-4.36514, 54.31122], [-4.3635, 54.3112], [-4.36178, 54.31036], [-4.36014, 54.31036], [-4.35675, 54.30869], [-4.35508, 54.30872], [-4.35433, 54.30911], [-4.35425, 54.30992], [-4.3535, 54.31033], [-4.35008, 54.31036], [-4.34758, 54.30914], [-4.34764, 54.30742], [-4.34517, 54.3062], [-4.33511, 54.3062], [-4.33342, 54.30536], [-4.33175, 54.30533], [-4.33017, 54.30447], [-4.32675, 54.30453], [-4.32516, 54.30367], [-4.32342, 54.3037], [-4.32172, 54.30286], [-4.31842, 54.30283], [-4.31672, 54.302], [-4.31517, 54.30203], [-4.31347, 54.30119], [-4.31172, 54.30119], [-4.31091, 54.30075], [-4.311, 54.29989], [-4.3093, 54.29911], [-4.30925, 54.29747], [-4.30766, 54.29662], [-4.30761, 54.29492], [-4.30925, 54.29411], [-4.3093, 54.29325], [-4.31008, 54.29283], [-4.31175, 54.29286], [-4.31425, 54.29158], [-4.31431, 54.29078], [-4.31844, 54.2887], [-4.32175, 54.28864], [-4.32344, 54.28951], [-4.32511, 54.28953], [-4.32597, 54.28911], [-4.32589, 54.28661], [-4.3243, 54.28578], [-4.32428, 54.28247], [-4.32261, 54.28162], [-4.32264, 54.27992], [-4.32592, 54.27827], [-4.32589, 54.27742], [-4.32761, 54.27661], [-4.32758, 54.27575], [-4.33258, 54.27331], [-4.33264, 54.27245], [-4.33342, 54.27203], [-4.33508, 54.272], [-4.33755, 54.27078], [-4.33764, 54.26991], [-4.341, 54.26822], [-4.34097, 54.26492], [-4.34261, 54.26411], [-4.34256, 54.26244], [-4.34341, 54.26205], [-4.34509, 54.26202], [-4.34595, 54.26161], [-4.34592, 54.26075], [-4.34422, 54.25992], [-4.34922, 54.25748], [-4.3493, 54.25661], [-4.35091, 54.25581], [-4.35089, 54.25494], [-4.35261, 54.25406], [-4.35258, 54.25328], [-4.36095, 54.24911], [-4.36095, 54.24661], [-4.36597, 54.24408], [-4.36597, 54.24245], [-4.36761, 54.24161], [-4.36425, 54.23994], [-4.36425, 54.23744], [-4.36589, 54.23661], [-4.36586, 54.23575], [-4.36758, 54.23494], [-4.36761, 54.23244], [-4.36922, 54.23161], [-4.36922, 54.23075], [-4.37092, 54.22994], [-4.37089, 54.22914], [-4.38345, 54.22283], [-4.38842, 54.22283], [-4.39014, 54.22203], [-4.39169, 54.22206], [-4.39428, 54.22078], [-4.39422, 54.21912], [-4.39597, 54.21831], [-4.39592, 54.21658], [-4.39764, 54.21577], [-4.39761, 54.21497], [-4.39922, 54.21408], [-4.39928, 54.21245], [-4.40089, 54.21161], [-4.40092, 54.20658], [-4.39925, 54.20575], [-4.39922, 54.20489], [-4.40095, 54.20414], [-4.39925, 54.20331], [-4.39922, 54.20244], [-4.39841, 54.202], [-4.39511, 54.20203], [-4.39098, 54.19992], [-4.39095, 54.19905], [-4.38925, 54.19823], [-4.38934, 54.19742], [-4.38586, 54.19576], [-4.38597, 54.19325], [-4.38758, 54.19241], [-4.38764, 54.19078], [-4.39597, 54.18661], [-4.39594, 54.18578], [-4.39755, 54.18494], [-4.39764, 54.18408], [-4.39925, 54.18327], [-4.39922, 54.18242], [-4.40086, 54.18158], [-4.40089, 54.17995], [-4.40589, 54.17741], [-4.40594, 54.17658], [-4.40669, 54.17616], [-4.41011, 54.17619], [-4.41172, 54.17536], [-4.41339, 54.17533], [-4.41511, 54.17447], [-4.41678, 54.1745], [-4.41753, 54.17409], [-4.41761, 54.17325], [-4.41922, 54.17242], [-4.41922, 54.16992], [-4.42008, 54.16949], [-4.42175, 54.16953], [-4.42261, 54.16908], [-4.42258, 54.16827], [-4.42345, 54.16786], [-4.42511, 54.16783], [-4.42672, 54.16702], [-4.43014, 54.16705], [-4.43175, 54.16617], [-4.43342, 54.1662], [-4.43503, 54.16533], [-4.43678, 54.16536], [-4.43847, 54.16614], [-4.44342, 54.1662], [-4.44592, 54.16497], [-4.44597, 54.16411], [-4.44675, 54.16364], [-4.46172, 54.1637], [-4.46756, 54.16078], [-4.46753, 54.15991], [-4.47097, 54.15828], [-4.47095, 54.15742], [-4.47256, 54.15659], [-4.47258, 54.15495], [-4.47422, 54.15405], [-4.47422, 54.14911], [-4.46928, 54.14658], [-4.46925, 54.14575], [-4.47097, 54.14491], [-4.47009, 54.14453], [-4.46669, 54.1445], [-4.46422, 54.14322], [-4.46422, 54.14078], [-4.46756, 54.13908], [-4.46764, 54.13822], [-4.47011, 54.137], [-4.47178, 54.13702], [-4.47511, 54.13533], [-4.47845, 54.13536], [-4.49342, 54.12786], [-4.49506, 54.12784], [-4.49592, 54.12742], [-4.49589, 54.12659], [-4.49922, 54.12494], [-4.49925, 54.12328], [-4.50003, 54.12286], [-4.50178, 54.12283], [-4.50336, 54.1237], [-4.50511, 54.12367], [-4.50677, 54.1245], [-4.50833, 54.12453], [-4.51003, 54.12537], [-4.51178, 54.12534], [-4.51339, 54.12453], [-4.51845, 54.12453], [-4.52008, 54.1237], [-4.52511, 54.12364], [-4.52589, 54.12328], [-4.52592, 54.12158], [-4.52917, 54.11995], [-4.52925, 54.11655], [-4.52756, 54.11572], [-4.52753, 54.11491], [-4.53667, 54.11031], [-4.53841, 54.11034], [-4.54095, 54.10912], [-4.54089, 54.10575], [-4.54261, 54.10492], [-4.5425, 54.10247], [-4.54422, 54.10158], [-4.5442, 54.10072], [-4.54506, 54.10039], [-4.54669, 54.10036], [-4.55003, 54.09866], [-4.56178, 54.09866], [-4.56339, 54.09953], [-4.56509, 54.09869], [-4.57169, 54.09866], [-4.57339, 54.0995], [-4.57503, 54.09953], [-4.57589, 54.09911], [-4.57586, 54.09828], [-4.57672, 54.09786], [-4.58011, 54.09786], [-4.58172, 54.097], [-4.58339, 54.09703], [-4.59167, 54.0928], [-4.59341, 54.09283], [-4.59428, 54.09242], [-4.59425, 54.09158], [-4.59673, 54.09033], [-4.60003, 54.09036], [-4.60089, 54.08994], [-4.60091, 54.08823], [-4.60253, 54.08742], [-4.6025, 54.08661], [-4.60423, 54.08572], [-4.60423, 54.08322], [-4.61003, 54.08036], [-4.61166, 54.08034], [-4.61339, 54.0795], [-4.61506, 54.07947], [-4.62086, 54.07661], [-4.62089, 54.07245], [-4.61753, 54.07078], [-4.61758, 54.06992], [-4.61669, 54.06953], [-4.61339, 54.06953], [-4.61092, 54.07076], [-4.61086, 54.07161], [-4.60506, 54.07447], [-4.60339, 54.0745], [-4.60261, 54.07411], [-4.6025, 54.07161], [-4.60508, 54.07036], [-4.60672, 54.07033], [-4.6075, 54.06995], [-4.60753, 54.06828], [-4.60922, 54.06739], [-4.60928, 54.06575], [-4.6125, 54.06411], [-4.61261, 54.06158], [-4.61583, 54.05994], [-4.61586, 54.05825], [-4.61747, 54.05742], [-4.61755, 54.05661], [-4.61916, 54.05576], [-4.61925, 54.05322], [-4.62172, 54.052], [-4.62503, 54.052], [-4.62672, 54.05283], [-4.62833, 54.05203], [-4.63172, 54.05203], [-4.63253, 54.05241], [-4.63255, 54.05328], [-4.62922, 54.05492], [-4.62928, 54.05578], [-4.62592, 54.05742], [-4.62589, 54.06158], [-4.62428, 54.06242], [-4.62417, 54.06492], [-4.62256, 54.06581], [-4.62425, 54.06664], [-4.62428, 54.06995], [-4.62586, 54.07078], [-4.62589, 54.07158], [-4.62669, 54.07203], [-4.63, 54.07203], [-4.63336, 54.07369], [-4.64664, 54.07369], [-4.6475, 54.07327], [-4.64758, 54.07242], [-4.65092, 54.07078], [-4.65086, 54.06992], [-4.65334, 54.0687], [-4.65675, 54.06863], [-4.65923, 54.06741], [-4.65919, 54.06661], [-4.66089, 54.06578], [-4.66089, 54.06078], [-4.66508, 54.05869], [-4.66673, 54.05869], [-4.67, 54.06036], [-4.67503, 54.06033], [-4.67842, 54.062], [-4.68005, 54.06197], [-4.68083, 54.06242], [-4.68092, 54.06409], [-4.68259, 54.06492], [-4.6825, 54.06741], [-4.6842, 54.06825], [-4.68425, 54.06992], [-4.68256, 54.0708], [-4.68591, 54.07247], [-4.68584, 54.07325], [-4.68922, 54.07492], [-4.68925, 54.07572], [-4.69172, 54.077], [-4.69339, 54.07703], [-4.69417, 54.07742], [-4.69419, 54.07828], [-4.69258, 54.07911], [-4.69253, 54.07989], [-4.69503, 54.08119], [-4.70169, 54.08119], [-4.70339, 54.08203], [-4.71008, 54.08205], [-4.71169, 54.08116], [-4.71675, 54.08116], [-4.71833, 54.082], [-4.72339, 54.08203], [-4.72672, 54.08034], [-4.72836, 54.08036], [-4.72923, 54.07994], [-4.72925, 54.07578], [-4.73172, 54.07455], [-4.73336, 54.07452], [-4.73505, 54.07536], [-4.73589, 54.07494], [-4.73592, 54.07327], [-4.73425, 54.07245], [-4.73419, 54.07161], [-4.73592, 54.07078], [-4.73589, 54.06992], [-4.73341, 54.0687], [-4.73175, 54.06866], [-4.73086, 54.06828], [-4.73083, 54.06741], [-4.73256, 54.06661], [-4.7325, 54.06575], [-4.73336, 54.06534], [-4.74172, 54.06534], [-4.74675, 54.06783], [-4.74753, 54.06747], [-4.74758, 54.06661], [-4.74919, 54.06581], [-4.74925, 54.06242], [-4.75, 54.062], [-4.75175, 54.06197], [-4.75253, 54.06158], [-4.7525, 54.05905], [-4.75336, 54.05864], [-4.75503, 54.05869], [-4.75672, 54.05786], [-4.76508, 54.05786], [-4.76667, 54.05869], [-4.76922, 54.05745], [-4.76917, 54.05408], [-4.77006, 54.05367], [-4.77333, 54.05367], [-4.77505, 54.05286], [-4.78, 54.05283], [-4.78089, 54.05328], [-4.78086, 54.05495], [-4.78255, 54.05578], [-4.78247, 54.05656], [-4.78416, 54.05739], [-4.78419, 54.05825], [-4.785, 54.05869], [-4.7867, 54.05789], [-4.78836, 54.05786], [-4.79173, 54.0595], [-4.79336, 54.0595], [-4.79508, 54.05867], [-4.79755, 54.05994]], [[-4.83089, 54.04997], [-4.83083, 54.05328], [-4.82667, 54.05533], [-4.82503, 54.05536], [-4.82169, 54.057], [-4.82005, 54.05703], [-4.81672, 54.05869], [-4.81497, 54.05864], [-4.81339, 54.0578], [-4.81006, 54.05952], [-4.80172, 54.05952], [-4.79925, 54.05825], [-4.79914, 54.05158], [-4.80086, 54.05075], [-4.8008, 54.04991], [-4.80167, 54.04956], [-4.80342, 54.04953], [-4.80581, 54.04828], [-4.80592, 54.04659], [-4.80753, 54.04575], [-4.80759, 54.04489], [-4.80833, 54.04447], [-4.81, 54.04449], [-4.81086, 54.04411], [-4.81084, 54.04158], [-4.81169, 54.04117], [-4.81333, 54.04117], [-4.81422, 54.04158], [-4.81416, 54.04239], [-4.81664, 54.04367], [-4.81836, 54.04283], [-4.82506, 54.04286], [-4.82584, 54.04325], [-4.82586, 54.04575], [-4.82755, 54.04659], [-4.82755, 54.04911], [-4.82836, 54.0495], [-4.83, 54.04953], [-4.83089, 54.04997]]];
+
+/* name, lat, lon, label side, tier (0 = always shown, 1 = only when zoomed in) */
+const PLACES = [
+  ["Point of Ayre",54.4194,-4.3667,"e",0],["Jurby Head",54.3556,-4.5333,"w",0],
+  ["Ramsey",54.3236,-4.3819,"e",0],["Maughold Head",54.2953,-4.3122,"e",0],
+  ["Laxey",54.2286,-4.3936,"e",0],["Douglas",54.1500,-4.4800,"e",0],
+  ["Langness",54.0525,-4.6167,"e",0],["Calf of Man",54.0500,-4.8200,"w",0],
+  ["Port Erin",54.0847,-4.7583,"e",0],["Niarbyl",54.1917,-4.7333,"w",0],
+  ["Peel",54.2250,-4.6944,"w",0],
+  ["Chicken Rock",54.0217,-4.8333,"w",1],["Bradda Head",54.0897,-4.7897,"w",1],
+  ["Ayre Hook",54.4050,-4.3400,"e",1],["Castletown",54.0742,-4.6547,"e",1],
+  ["Santon",54.1092,-4.5539,"e",1],["Derbyhaven",54.0797,-4.6300,"e",1],
+  ["Contrary Head",54.2144,-4.7050,"w",1]
+];
+const SEA_LABELS = [["Irish Sea",54.30,-4.05,0],["Ramsey Bay",54.330,-4.255,0],
+  ["Calf Sound",54.068,-4.812,1],["Bay ny Carrickey",54.055,-4.700,1],["The Chickens",54.026,-4.845,1]];
+
+const CAPTIONS = {
+"-6":"Streams beginning off SE & NW coasts, strengthening off Point of Ayre, S of Contrary Head and through Calf Sound.",
+"-5":"Streams strengthening all round the Island. Calf Sound almost at maximum; eddies begin at Chicken Rock & Langness.",
+"-4":"Streams turning in Ramsey Bay and off the SE coast. Overfalls & race E of the Chickens and off Langness. Calf Sound stream weakening. Streams NE of Point of Ayre near maximum.",
+"-3":"Streams at maximum between the Chickens & Langness, with overfalls & race at both. Eddy along the SE coast. Overfalls off Point of Ayre.",
+"-2":"Calf Sound almost slack. Overfalls E of the Chickens and off Langness. Overfalls or race at Ayre Hook.",
+"-1":"Streams off the W coast and through Calf Sound now N-bound. Overfalls off the Chickens, Langness and Ayre Hook. Streams S of Point of Ayre now slackening quickly.",
+"+0":"Offshore streams are turning and weak, except in the NE. Stream in Calf Sound gaining strength.",
+"+1":"Overfalls at springs N of the Chickens and S of Langness. Calf Sound nearing maximum. Race off Point of Ayre.",
+"+2":"Overfalls off Langness and N of the Chickens. Race off Point of Ayre. Streams off the NE coast and Niarbyl at maximum.",
+"+3":"Streams at maximum off the Chickens & Langness, with overfalls. Race off Point of Ayre. Streams at maximum off the E & NW coasts. Calf Sound becomes slack.",
+"+4":"Race or overfalls at Point of Ayre. Overfalls off the Chickens & Langness.",
+"+5":"Streams slack in Ramsey Bay and off Maughold Head. Stream strengthening in Calf Sound.",
+"+6":"Streams turning from Point of Ayre to Peel and offshore in the S. A southerly stream has begun in Ramsey Bay."
+};
+
+const NOTES = [
+["Calf Sound","S-going stream begins HW +03.45. N-going stream begins HW &minus;01.45. Maximum current (up to 4 kn) around HW and LW; minimum around half-tide."],
+["Chicken Rock","Overfalls or a race extend E from Chicken Rock on the E-going stream beginning HW &minus;05.50, and N from Chicken Rock on the W-going stream beginning HW 00.00."],
+["Langness Point","Flood sets E towards Langness (up to 5 kn springs, with overfalls). E-going stream begins HW &minus;05.50; W-going at HW 00.00."],
+["Bay ny Carrickey","Tide sets between the shore and the Carrick, running clockwise on the flood and anti-clockwise on the ebb (2 kn springs), changing one hour before HW and LW."],
+["Santon to Maughold Head","Main flood at Langness sets E to England, with a stream also running NE (2.5 kn springs) before meeting the N flood from Point of Ayre at Maughold Head. NE stream begins approx HW +5.30; SW-going stream begins HW &minus;04.00 (Santon), HW &minus;03.00 (Douglas)."],
+["Point of Ayre","An eddy forms W of the Point during the W-going stream, and SE of the Point during the E-going stream. Race or overfalls occur where these meet the main tidal streams."]
+];
+
+/* ============================ projection ============================ */
+const LAT0=54.24, KX=Math.cos(LAT0*Math.PI/180);
+const BB={w:-5.16,e:-3.94,s:53.87,n:54.63};
+const px = lon => (lon-BB.w)*KX, py = lat => (BB.n-lat);
+const W = px(BB.e), H = py(BB.s);
+const unpx = x => x/KX + BB.w, unpy = y => BB.n - y;
+
+/* ============================ state ============================ */
+const state = { stations:[], vals:{}, nextId:1, ratio:0.60 };
+HOURS.forEach(h=>state.vals[hKey(h)]={});
+let hour = -6, mode = "stations", sel = null, showLabels = true;
+
+/* auto-save if the host provides artifact storage; harmless when it doesn't */
+const STORE_KEY = "manx-tidal-streams:v1";
+async function save(){
+  try{ if(window.storage) await window.storage.set(STORE_KEY, JSON.stringify(pack())); }catch(e){}
+}
+async function restore(){
+  try{
+    if(!window.storage) return;
+    const r = await window.storage.get(STORE_KEY);
+    if(r && r.value) unpack(JSON.parse(r.value));
+  }catch(e){}
+}
+function pack(){
+  return {format:"manx-tidal-streams", version:1, reference:"HW Liverpool",
+    source:"Isle of Man Government tidal stream charts (tidal_streams.pdf / tidal_streams_2.pdf)",
+    neapRatio:state.ratio, stations:state.stations, values:state.vals};
+}
+function unpack(d){
+  if(!d || !Array.isArray(d.stations)) throw new Error("Not a tidal streams file");
+  state.stations = d.stations.map(o=>({kind:"stream", ...o}));
+  state.ratio = (typeof d.neapRatio==="number" && d.neapRatio>0) ? d.neapRatio : 0.60;
+  HOURS.forEach(h=>state.vals[hKey(h)] = (d.values && d.values[hKey(h)]) || {});
+  state.nextId = state.stations.reduce((m,s)=>Math.max(m,s.id),0)+1;
+}
+
+const V = (h,id) => state.vals[hKey(h)][id];
+const filled = h => Object.keys(state.vals[hKey(h)]).length;
+const total  = () => HOURS.reduce((n,h)=>n+filled(h),0);
+
+/* ============================ svg helpers ============================ */
+const NS="http://www.w3.org/2000/svg";
+const el=(n,a={})=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const $=s=>document.querySelector(s);
+
+/* rate -> colour: cool slack blue through to Admiralty magenta at max */
+function rateColour(r){
+  const stops=[[0,[109,140,160]],[2,[122,74,134]],[4.5,[176,24,111]]];
+  if(r<=0) return "rgb(109,140,160)";
+  let a=stops[0],b=stops[stops.length-1];
+  for(let i=0;i<stops.length-1;i++) if(r>=stops[i][0]&&r<=stops[i+1][0]){a=stops[i];b=stops[i+1];break;}
+  const t=Math.min(1,Math.max(0,(r-a[0])/((b[0]-a[0])||1)));
+  return `rgb(${a[1].map((c,i)=>Math.round(c+(b[1][i]-c)*t)).join(",")})`;
+}
+
+/* ============================ map view ============================ */
+function makeView(svgSel, wrapSel){
+  const svg=$(svgSel), wrap=$(wrapSel);
+  const v={svg,wrap,z:1,ox:0,oy:0,layers:{}};
+  ["sea","grid","land","places","art","ui"].forEach(k=>{
+    v.layers[k]=el("g",{class:"L-"+k}); svg.appendChild(v.layers[k]);
+  });
+  v.fit=()=>{
+    const r=wrap.getBoundingClientRect();
+    const s=Math.min(r.width/W, r.height/H)*0.98;
+    v.z=s; v.fitZ=s; v.ox=(r.width-W*s)/2; v.oy=(r.height-H*s)/2; v.apply();
+  };
+  v.apply=()=>{
+    const t=`translate(${v.ox},${v.oy}) scale(${v.z})`;
+    for(const k in v.layers) v.layers[k].setAttribute("transform",t);
+    v.layers.art.setAttribute("data-z",v.z);
+  };
+  v.toGeo=(cx,cy)=>{
+    const r=wrap.getBoundingClientRect();
+    const x=(cx-r.left-v.ox)/v.z, y=(cy-r.top-v.oy)/v.z;
+    return {lon:unpx(x), lat:unpy(y)};
+  };
+  v.toPx=(lon,lat)=>({x:px(lon),y:py(lat)});
+  /* zoom limits are relative to the fitted scale, which is ~900 because the
+     projection works in degrees. Absolute limits here were the old bug. */
+  v.zoomAt=(cx,cy,f)=>{
+    const base=v.fitZ||v.z;
+    const nz=Math.max(base*0.7, Math.min(base*90, v.z*f));
+    if(nz===v.z) return;
+    v.ox=cx-(cx-v.ox)*(nz/v.z); v.oy=cy-(cy-v.oy)*(nz/v.z); v.z=nz; v.apply(); v.draw&&v.draw();
+  };
+  v.zoomStep=d=>{
+    const r=wrap.getBoundingClientRect();
+    if(d===0){ v.fit(); v.draw&&v.draw(); return; }
+    v.zoomAt(r.width/2, r.height/2, d>0?1.5:1/1.5);
+  };
+  wrap.addEventListener("wheel",e=>{
+    e.preventDefault();
+    let dy=e.deltaY;
+    if(e.deltaMode===1) dy*=16; else if(e.deltaMode===2) dy*=400;   /* lines / pages */
+    const f=Math.max(0.4,Math.min(2.5,Math.exp(-dy*0.0016)));
+    const r=wrap.getBoundingClientRect();
+    v.zoomAt(e.clientX-r.left, e.clientY-r.top, f);
+  },{passive:false});
+  /* two-finger pinch */
+  const pts=new Map(); v.pointers=pts; let pd=0;
+  wrap.addEventListener("pointerdown",e=>{
+    if(e.isPrimary) pts.clear();       /* a primary press starts a fresh gesture: drop any stale pointers */
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  });
+  wrap.addEventListener("pointermove",e=>{
+    if(!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2){
+      const [a,b]=[...pts.values()], d=Math.hypot(a.x-b.x,a.y-b.y), r=wrap.getBoundingClientRect();
+      if(pd>0) v.zoomAt((a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top, d/pd);
+      pd=d;
+    }
+  });
+  const drop=e=>{ pts.delete(e.pointerId); if(pts.size<2) pd=0; };
+  wrap.addEventListener("pointerup",drop);
+  wrap.addEventListener("pointercancel",drop);
+  window.addEventListener("pointerup",drop);       /* release outside the window still counts */
+  window.addEventListener("pointercancel",drop);
+  window.addEventListener("blur",()=>{ pts.clear(); pd=0; });
+  return v;
+}
+
+function drawBase(v){
+  const L=v.layers, k=1/Math.max(v.z,0.001);
+  const key=v.z.toFixed(4)+"|"+showLabels+"|"+(v.fitZ||0).toFixed(2);
+  if(v._baseKey===key) return;      /* 771-point coastline: only rebuild when the view changes */
+  v._baseKey=key;
+  L.sea.replaceChildren(el("rect",{x:0,y:0,width:W,height:H,class:"sea-fill"}));
+  /* graticule at 10 minutes; strokes and type sized in screen px via k */
+  const g=L.grid; g.replaceChildren();
+  for(let lon=Math.ceil(BB.w*6)/6; lon<BB.e; lon+=1/6){
+    g.appendChild(el("line",{x1:px(lon),y1:0,x2:px(lon),y2:H,class:"grid","stroke-width":0.6*k}));
+    const t=el("text",{x:px(lon)+3*k,y:H-4*k,class:"grid-lab","font-size":9*k});
+    t.textContent=fmtDeg(-lon,"W"); g.appendChild(t);
+  }
+  for(let lat=Math.ceil(BB.s*6)/6; lat<BB.n; lat+=1/6){
+    g.appendChild(el("line",{x1:0,y1:py(lat),x2:W,y2:py(lat),class:"grid","stroke-width":0.6*k}));
+    const t=el("text",{x:3*k,y:py(lat)-4*k,class:"grid-lab","font-size":9*k});
+    t.textContent=fmtDeg(lat,"N"); g.appendChild(t);
+  }
+  L.land.replaceChildren();
+  COAST.forEach(ring=>{
+    const d="M"+ring.map(c=>px(c[0]).toFixed(5)+","+py(c[1]).toFixed(5)).join("L")+"Z";
+    L.land.appendChild(el("path",{d,class:"coast","stroke-width":1.3*k}));
+  });
+  drawPlaces(v);
+}
+function fmtDeg(d,h){const dd=Math.floor(d+1e-9),m=Math.round((d-dd)*60);return `${dd}\u00b0${String(m).padStart(2,"0")}'${h}`;}
+
+function drawPlaces(v){
+  const g=v.layers.places; g.replaceChildren();
+  if(!showLabels) return;
+  const k=1/Math.max(v.z,0.001);
+  const detail = v.z > (v.fitZ||1)*1.7;   /* minor names appear once there is room for them */
+  PLACES.forEach(([n,lat,lon,side,tier])=>{
+    if(tier && !detail) return;
+    const x=px(lon),y=py(lat);
+    g.appendChild(el("circle",{cx:x,cy:y,r:1.6*k,class:"place-dot"}));
+    const t=el("text",{x:x+(side==="e"?5*k:-5*k),y:y+3*k,class:"place",
+      "text-anchor":side==="e"?"start":"end","font-size":(9*k)});
+    t.textContent=n; g.appendChild(t);
+  });
+  SEA_LABELS.forEach(([n,lat,lon,tier])=>{
+    if(tier && !detail) return;
+    const t=el("text",{x:px(lon),y:py(lat),class:"place sea","text-anchor":"middle","font-size":(10*k)});
+    t.textContent=n; g.appendChild(t);
+  });
+}
+
+/* arrow geometry, in projected units, scaled to stay constant on screen */
+function arrowPath(g,x,y,bearing,rate,k,opt={}){
+  const len=(6+Math.min(rate,5)*4.4)*k;
+  const th=(bearing-90)*Math.PI/180;
+  const dx=Math.cos(th), dy=Math.sin(th);
+  const x2=x+dx*len, y2=y+dy*len;
+  const col=opt.colour||rateColour(rate);
+  const w=(1.1+Math.min(rate,5)*0.42)*k;
+  const ln=el("line",{x1:x,y1:y,x2:x2,y2:y2,class:"arrow",stroke:col,"stroke-width":w,opacity:opt.op??1});
+  if(opt.dash) ln.setAttribute("stroke-dasharray",(2.8*k)+" "+(2.4*k));
+  g.appendChild(ln);
+  const hl=(3.4+Math.min(rate,5)*1.5)*k, hw=hl*0.52;
+  const p=[[x2,y2],[x2-dx*hl-dy*hw,y2-dy*hl+dx*hw],[x2-dx*hl+dy*hw,y2-dy*hl-dx*hw]];
+  /* NOTE: no rounding here. Map units are degrees, so the whole head is ~0.006 units
+     across; rounding to 2dp collapsed it to a zero-area polygon at most zoom levels. */
+  g.appendChild(el("polygon",{points:p.map(q=>q[0]+","+q[1]).join(" "),
+    class:"arrow-head",fill:col,opacity:opt.op??1}));
+  return {x2,y2};
+}
+function overfallsMark(g,x,y,k,kind){
+  const col="#a8620d", rows=(kind==="race")?3:2, w=4.6*k, n=3;
+  for(let r=0;r<rows;r++){
+    const y0=y+(r-(rows-1)/2)*3.4*k;
+    let d=`M ${x-w*n/2} ${y0}`;
+    for(let i=0;i<n;i++) d+=` q ${w/2} ${-3.1*k} ${w} 0`;
+    g.appendChild(el("path",{d,fill:"none",stroke:col,"stroke-width":1.4*k,"stroke-linecap":"round"}));
+  }
+}
+/* draw one station's value. Eddies are drawn as the source charts draw them: a dashed arrow. */
+function drawValue(g,x,y,kind,v,k,spring){
+  if(!v) return;
+  if(kind==="overfalls"){ overfallsMark(g,x,y,k,v.f); return; }
+  if(v.q && v.b==null){ qMark(g,x,y,v.q,k); return; }      /* no direction given */
+  if(v.q){ arrowPath(g,x,y,v.b,rateOf(v,spring),k,{dash:true,colour:"#7d99a6"}); return; }
+  arrowPath(g,x,y,v.b,rateOf(v,spring),k, kind==="eddy"?{dash:true,colour:"#4a626e"}:{});
+}
+const KIND_COLOUR={stream:"#8ba1ad",overfalls:"#a8620d",eddy:"#4a626e"};
+function qMark(g,x,y,q,k){
+  const col="#7d99a6", r=3.6*k;
+  if(q==="slack"){ g.appendChild(el("circle",{cx:x,cy:y,r,class:"qmark",stroke:col,"stroke-width":1.3*k})); }
+  else if(q==="weak"){
+    g.appendChild(el("circle",{cx:x,cy:y,r:r*0.55,class:"qmark",stroke:col,"stroke-width":1.3*k}));
+  } else { /* turning */
+    const d=`M ${x-r} ${y} A ${r} ${r} 0 1 1 ${x} ${y+r}`;
+    g.appendChild(el("path",{d,class:"qmark",stroke:col,"stroke-width":1.3*k}));
+    g.appendChild(el("polygon",{points:`${x},${y+r} ${x-2.4*k},${y+r-2.6*k} ${x+2.4*k},${y+r-2.6*k}`,fill:col}));
+  }
+}
+
+/* ============================ editor map ============================ */
+const ed = makeView("#map","#mapWrap");
+let drag=null;
+
+ed.draw=function(){
+  const g=ed.layers.art, u=ed.layers.ui;
+  g.replaceChildren(); u.replaceChildren();
+  const k=1/Math.max(ed.z,0.001);
+  drawBase(ed);
+  state.stations.forEach(s=>{
+    const x=px(s.lon),y=py(s.lat), val=V(hour,s.id);
+    drawValue(g,x,y,s.kind||"stream",val,k,1);
+    const c=el("circle",{cx:x,cy:y,r:(val?2.6:3.2)*k,"stroke-width":(sel===s.id?2.4:1.3)*k,
+      stroke:(sel===s.id?null:KIND_COLOUR[s.kind||"stream"]),
+      class:"stn"+(val?" has":"")+(sel===s.id?" sel":"")});
+    c.dataset.id=s.id; g.appendChild(c);
+  });
+  if(sel!=null){
+    const s=state.stations.find(q=>q.id===sel);
+    if(s && (s.kind||"stream")!=="overfalls") drawRose(u,px(s.lon),py(s.lat),k);
+  }
+  if(drag&&drag.live){
+    const s=state.stations.find(q=>q.id===drag.id);
+    if(s && (s.kind||"stream")!=="overfalls") arrowPath(u,px(s.lon),py(s.lat),drag.b,2.4,k,{colour:"#16242c",op:.55});
+  }
+};
+function drawRose(g,x,y,k){
+  const R=30*k, r=el("g",{class:"rose"});
+  r.appendChild(el("circle",{cx:x,cy:y,r:R,"stroke-width":0.9*k}));
+  for(let a=0;a<360;a+=30){
+    const th=(a-90)*Math.PI/180, i=(a%90===0)?0.82:0.92;
+    r.appendChild(el("line",{x1:x+Math.cos(th)*R*i,y1:y+Math.sin(th)*R*i,
+      x2:x+Math.cos(th)*R,y2:y+Math.sin(th)*R,"stroke-width":0.9*k}));
+  }
+  ["N","E","S","W"].forEach((n,i)=>{
+    const th=(i*90-90)*Math.PI/180;
+    const t=el("text",{x:x+Math.cos(th)*R*1.18,y:y+Math.sin(th)*R*1.18+3*k,
+      "text-anchor":"middle","font-size":8*k}); t.textContent=n; r.appendChild(t);
+  });
+  g.appendChild(r);
+}
+/* Fill the missing half of a springs/neaps pair, and flag it as derived rather than read */
+function deriveRates(o,spHas,npHas){
+  if(spHas && npHas){ delete o.est; return o; }
+  if(spHas && !npHas){ o.np=+(o.sp*state.ratio).toFixed(2); o.est="np"; return o; }
+  if(npHas && !spHas){ o.sp=+(o.np/state.ratio).toFixed(2); o.est="sp"; return o; }
+  return o;
+}
+function reapplyRatio(){
+  HOURS.forEach(h=>{
+    const f=state.vals[hKey(h)];
+    for(const id in f){
+      const v=f[id];
+      if(v.est==="np" && v.sp!=null) v.np=+(v.sp*state.ratio).toFixed(2);
+      else if(v.est==="sp" && v.np!=null) v.sp=+(v.np/state.ratio).toFixed(2);
+    }
+  });
+}
+function countDerived(){
+  let n=0; HOURS.forEach(h=>{ const f=state.vals[hKey(h)]; for(const id in f) if(f[id].est) n++; });
+  return n;
+}
+/* the neap:spring ratio implied by the pairs actually read off the charts */
+function observedRatio(){
+  const r=[];
+  HOURS.forEach(h=>{ const f=state.vals[hKey(h)];
+    for(const id in f){ const v=f[id];
+      if(!v.est && v.sp>0 && v.np>0 && v.sp!==v.np) r.push(v.np/v.sp); } });
+  if(!r.length) return null;
+  r.sort((a,b)=>a-b);
+  return {median:r[(r.length-1)>>1], n:r.length};
+}
+const QRATE={slack:0, turning:0.12, weak:0.25};
+function rateOf(v,spring){
+  if(v.q) return QRATE[v.q] ?? 0;
+  return (v.np ?? v.sp ?? 0) + spring*((v.sp ?? v.np ?? 0)-(v.np ?? v.sp ?? 0));
+}
+
+/* pointer behaviour on the editor map */
+(function(){
+  const wrap=$("#mapWrap");
+  let down=null;
+  const addStation=e=>{
+    const g=ed.toGeo(e.clientX,e.clientY);
+    const s={id:state.nextId++, kind:"stream", lat:+g.lat.toFixed(5), lon:+g.lon.toFixed(5)};
+    state.stations.push(s); sel=s.id; syncEntry(); ed.draw(); paintStrip(); save();
+  };
+  wrap.addEventListener("pointerdown",e=>{
+    if(ed.pointers.size>1){ drag=null; down=null; return; }
+    const id=e.target.dataset && e.target.dataset.id;
+    try{ wrap.setPointerCapture(e.pointerId); }catch(_){}
+    if(id){
+      sel=+id;
+      if(mode==="values") drag={id:sel,b:0,live:false};
+      syncEntry(); ed.draw(); return;
+    }
+    down={x:e.clientX,y:e.clientY,ox:ed.ox,oy:ed.oy,moved:false,shift:e.shiftKey};
+  });
+  wrap.addEventListener("pointermove",e=>{
+    if(ed.pointers.size>1){ drag=null; down=null; return; }
+    if(drag){
+      const s=state.stations.find(q=>q.id===drag.id); if(!s) return;
+      const g=ed.toGeo(e.clientX,e.clientY);
+      const dx=(g.lon-s.lon)*KX, dy=(g.lat-s.lat);
+      if(Math.hypot(dx,dy)<0.0006) return;
+      drag.b=(Math.atan2(dx,dy)*180/Math.PI+360)%360; drag.live=true;
+      const f=$("#fB"); if(f) f.value=Math.round(drag.b);
+      ed.draw(); return;
+    }
+    if(down){
+      if(Math.hypot(e.clientX-down.x, e.clientY-down.y)>4) down.moved=true;
+      if(down.moved){ ed.ox=down.ox+(e.clientX-down.x); ed.oy=down.oy+(e.clientY-down.y); ed.apply(); }
+    }
+  });
+  wrap.addEventListener("pointerup",e=>{
+    if(drag){
+      const st=state.stations.find(q=>q.id===drag.id);
+      if(drag.live && st && (st.kind||"stream")!=="overfalls"){
+        const v=cur()||{}; v.b=Math.round(drag.b); setCur(v);
+      }
+      drag=null; ed.draw();
+    } else if(down){
+      if(!down.moved && (mode==="stations" || down.shift)) addStation(e);
+      down=null;
+    }
+  });
+  wrap.addEventListener("pointercancel",()=>{ drag=null; down=null; });
+  wrap.addEventListener("contextmenu",e=>e.preventDefault());
+})();
+
+/* ============================ entry bar ============================ */
+function cur(){ if(sel==null) return null; const v=V(hour,sel); return v?{...v}:null; }
+function setCur(v){
+  if(sel==null) return;
+  if(v==null) delete state.vals[hKey(hour)][sel];
+  else state.vals[hKey(hour)][sel]=v;
+  syncEntry(); ed.draw(); paintStrip(); save();
+}
+
+function syncEntry(){
+  const bar=$("#entryBar");
+  if(mode==="stations"){
+    const st=state.stations.find(x=>x.id===sel);
+    bar.innerHTML = `<div class="hint">Click open water to drop a station wherever any hour of the charts shows a mark &mdash; place the union of all thirteen, not just the common ones. Leave a station blank in the hours where nothing is drawn.</div>
+      <div class="fld"><label for="fKind">Type of mark</label><select id="fKind" ${sel==null?"disabled":""}>
+        <option value="stream">Stream arrow (solid)</option>
+        <option value="overfalls">Overfalls / race</option>
+        <option value="eddy">Eddy (dashed arrow)</option></select></div>
+      <div class="act">
+        <span class="hint" style="max-width:none">${state.stations.length} stations</span>
+        <button class="btn ghost-b" id="bDel" ${sel==null?"disabled":""}>Delete selected</button>
+      </div>`;
+    if(st) $("#fKind").value = st.kind||"stream";
+    $("#fKind").onchange=e=>{
+      const x=state.stations.find(q=>q.id===sel); if(!x) return;
+      x.kind=e.target.value;
+      HOURS.forEach(h=>delete state.vals[hKey(h)][x.id]);   /* old values no longer fit the new type */
+      ed.draw(); paintStrip(); save();
+    };
+    const d=$("#bDel"); if(d) d.onclick=()=>{
+      if(sel==null) return;
+      state.stations=state.stations.filter(s=>s.id!==sel);
+      HOURS.forEach(h=>delete state.vals[hKey(h)][sel]);
+      sel=null; syncEntry(); ed.draw(); paintStrip(); save();
+    };
+    return;
+  }
+  const v=cur();
+  const stn=state.stations.find(s=>s.id===sel);
+  const kind=(stn&&stn.kind)||"stream";
+  const head=`<div class="fld"><label>Station</label><input value="${stn?("#"+stn.id+" "+kind.slice(0,3)):"\u2014"}" readonly style="width:74px"></div>`;
+  const tail=`<div class="act">
+      <button class="btn ghost-b" id="bClr" ${v?"":"disabled"}>Clear</button>
+      <button class="btn" id="bNext">Next unfilled</button>
+    </div>`;
+  let fields, ids, read;
+
+  if(kind==="overfalls"){
+    fields=`<div class="fld"><label for="fF">This hour</label><select id="fF">
+        <option value="">&mdash; nothing drawn</option>
+        <option value="overfalls">overfalls</option>
+        <option value="race">race</option></select></div>
+      <div class="hint">Tick only the hours where the chart draws the wave symbol. Overfalls are not interpolated &mdash; they show for the hour you mark, give or take half an hour.</div>`;
+    ids=["fF"];
+    read=()=>{ const f=$("#fF").value; return f?{f}:null; };
+  } else {
+    fields=`<div class="fld"><label for="fB">Bearing</label><input id="fB" type="number" min="0" max="359" step="1" value="${v&&v.b!=null?v.b:""}" placeholder="000"></div>
+      <div class="fld"><label for="fSp">Springs kn</label><input id="fSp" type="number" step="0.1" min="0" value="${v&&v.sp!=null?v.sp:""}" placeholder="2.0"></div>
+      <div class="fld"><label for="fNp">Neaps kn</label><input id="fNp" type="number" step="0.1" min="0" value="${v&&v.np!=null?v.np:""}" placeholder="1.2"></div>
+      <div class="fld"><label for="fQ">Or note</label><select id="fQ">
+        <option value="">&mdash;</option><option value="weak">weak</option>
+        <option value="turning">turning</option><option value="slack">slack</option></select></div>
+      <div class="fld"><label for="fRatio">Neap est. &times;</label><input id="fRatio" type="number" step="0.05" min="0.1" max="1" value="${state.ratio}" title="Used to fill whichever of springs/neaps you leave blank"></div>
+      <div class="hint">${kind==="eddy"?"Drawn dashed, as on the charts. ":""}For a bare WEAK / TURNING / SLACK, use the note and leave everything else empty. Leave neaps blank and it is estimated from springs, shown in amber. <kbd>Enter</kbd> next &middot; <kbd>[</kbd> <kbd>]</kbd> hour</div>`;
+    ids=["fB","fSp","fNp","fQ"];
+    read=()=>{
+      const b=$("#fB").value, sp=$("#fSp").value, np=$("#fNp").value, q=$("#fQ").value;
+      if(q) return {q, b:b===""?null:+b};
+      if(b===""&&sp===""&&np==="") return null;
+      const o={q:null, b:b===""?0:+b};
+      if(sp!=="") o.sp=+sp;
+      if(np!=="") o.np=+np;
+      return deriveRates(o, sp!=="", np!=="");
+    };
+  }
+
+  bar.innerHTML = head+fields+tail;
+  if(v&&v.q&&$("#fQ")) $("#fQ").value=v.q;
+  if(v&&v.f&&$("#fF")) $("#fF").value=v.f;
+  if(v&&v.est){ const e=$("#f"+(v.est==="np"?"Np":"Sp")); if(e){ e.classList.add("est"); e.title="Estimated from the other figure, not read off the chart"; } }
+  const rf=$("#fRatio");
+  if(rf) rf.addEventListener("change",()=>{
+    const x=+rf.value;
+    if(!(x>0&&x<=1)){ rf.value=state.ratio; return; }
+    state.ratio=x; reapplyRatio(); syncEntry(); ed.draw(); save();
+  });
+  ids.forEach(id=>{
+    const e=$("#"+id); if(!e) return;
+    e.addEventListener("change",()=>setCur(read()));
+    e.addEventListener("keydown",ev=>{ if(ev.key==="Enter"){ ev.preventDefault(); setCur(read()); nextUnfilled(); } });
+  });
+  $("#bClr").onclick=()=>setCur(null);
+  $("#bNext").onclick=nextUnfilled;
+}
+function nextUnfilled(){
+  if(!state.stations.length) return;
+  const i=state.stations.findIndex(s=>s.id===sel);
+  for(let n=1;n<=state.stations.length;n++){
+    const s=state.stations[(i+n+state.stations.length)%state.stations.length];
+    if(!V(hour,s.id)){ sel=s.id; syncEntry(); ed.draw(); focusFirst(); return; }
+  }
+  sel=state.stations[(i+1)%state.stations.length].id; syncEntry(); ed.draw(); focusFirst();
+}
+function focusFirst(){ const e=$("#fB")||$("#fF")||$("#fRot"); if(e){ e.focus(); e.select&&e.select(); } }
+
+/* ============================ frame strip ============================ */
+function paintStrip(){
+  const s=$("#strip");
+  if(!s.children.length){
+    HOURS.forEach(h=>{
+      const b=document.createElement("button");
+      b.innerHTML=`<b>${hLab(h)}</b><i></i><span class="bar"></span>`;
+      b.onclick=()=>{ hour=h; refresh(); };
+      s.appendChild(b);
+    });
+  }
+  HOURS.forEach((h,i)=>{
+    const b=s.children[i], n=filled(h), t=state.stations.length||1;
+    b.setAttribute("aria-current", h===hour);
+    b.querySelector("i").textContent = state.stations.length? `${n}/${state.stations.length}` : "\u2014";
+    b.querySelector(".bar").style.width=(100*n/t)+"%";
+  });
+}
+
+/* ============================ scan pane ============================ */
+const scan={z:1,x:0,y:0,nat:[1,1]};
+function loadScan(){
+  const img=$("#scanImg"), src=SCANS[hKey(hour)];
+  $("#scanTitle").textContent = `Source chart \u00b7 ${hLab(hour)} hrs`;
+  img.onload=()=>{ scan.nat=[img.naturalWidth,img.naturalHeight]; fitScan(); };
+  img.src=src||"";
+}
+function fitScan(){
+  const w=$("#scanWrap").getBoundingClientRect();
+  scan.z=Math.min(w.width/scan.nat[0], w.height/scan.nat[1]);
+  scan.x=(w.width-scan.nat[0]*scan.z)/2; scan.y=(w.height-scan.nat[1]*scan.z)/2; applyScan();
+}
+function applyScan(){ $("#scanImg").style.transform=`translate(${scan.x}px,${scan.y}px) scale(${scan.z})`; }
+(function(){
+  const wrap=$("#scanWrap"); let p=null;
+  wrap.addEventListener("pointerdown",e=>{p={x:e.clientX,y:e.clientY,ox:scan.x,oy:scan.y};wrap.classList.add("drag");wrap.setPointerCapture(e.pointerId);});
+  wrap.addEventListener("pointermove",e=>{if(!p)return;scan.x=p.ox+(e.clientX-p.x);scan.y=p.oy+(e.clientY-p.y);applyScan();});
+  wrap.addEventListener("pointerup",()=>{p=null;wrap.classList.remove("drag");});
+  wrap.addEventListener("wheel",e=>{
+    e.preventDefault();
+    const r=wrap.getBoundingClientRect(),cx=e.clientX-r.left,cy=e.clientY-r.top;
+    const f=Math.exp(-e.deltaY*0.0018),nz=Math.min(14,Math.max(0.1,scan.z*f));
+    scan.x=cx-(cx-scan.x)*(nz/scan.z); scan.y=cy-(cy-scan.y)*(nz/scan.z); scan.z=nz; applyScan();
+  },{passive:false});
+  document.querySelectorAll("[data-zoom]").forEach(b=>b.onclick=()=>{
+    const d=+b.dataset.zoom;
+    if(d===0) return fitScan();
+    const r=$("#scanWrap").getBoundingClientRect(),cx=r.width/2,cy=r.height/2,nz=scan.z*(d>0?1.35:1/1.35);
+    scan.x=cx-(cx-scan.x)*(nz/scan.z); scan.y=cy-(cy-scan.y)*(nz/scan.z); scan.z=nz; applyScan();
+  });
+})();
+
+/* ============================ play ============================ */
+const pv = makeView("#pmap","#playWrap");
+let t=0, playing=false, dir=1, last=0;
+
+/* nearest filled hours either side of t, so a blank hour interpolates
+   straight across instead of making the arrow blink out */
+function bracket(id,tt){
+  let lo=null,hi=null;
+  for(const h of HOURS){
+    const v=V(h,id); if(!v) continue;
+    if(h<=tt) lo={h,v};
+    if(h>=tt){ hi={h,v}; break; }
+  }
+  if(!lo&&!hi) return null;
+  if(!lo) return {a:hi.v,b:hi.v,u:0};
+  if(!hi) return {a:lo.v,b:lo.v,u:0};
+  const span=hi.h-lo.h;
+  return {a:lo.v,b:hi.v,u:span?(tt-lo.h)/span:0};
+}
+pv.draw=function(){
+  const g=pv.layers.art; g.replaceChildren();
+  const k=1/Math.max(pv.z,0.001), spring=+$("#spring").value/100;
+  drawBase(pv);
+  const nearest=Math.round(t);
+  state.stations.forEach(s=>{
+    const kind=s.kind||"stream", x=px(s.lon), y=py(s.lat);
+    /* overfalls and eddies are discrete: they show for the hours they are marked */
+    if(kind==="overfalls"){ const v=V(nearest,s.id); if(v) overfallsMark(g,x,y,k,v.f); return; }
+    const br=bracket(s.id,t); if(!br) return;
+    const {a,b,u}=br;
+    const ba=(a.b!=null)?a.b:b.b, bb=(b.b!=null)?b.b:ba;
+    if(ba==null){ qMark(g,x,y,a.q||b.q||"turning",k); return; }   /* no direction on either side */
+    const ra=rateOf(a,spring), rb=rateOf(b,spring);
+    const r=ra+(rb-ra)*u;
+    if(r<0.05){ qMark(g,x,y,a.q||b.q||"slack",k); return; }
+    const faint = !!(a.q && b.q);
+    arrowPath(g,x,y,angLerp(ba,bb,u),r,k,
+      kind==="eddy" ? {dash:true,colour:"#4a626e"} : (faint?{dash:true,colour:"#7d99a6"}:{}));
+  });
+};
+function angLerp(a,b,u){ let d=((b-a+540)%360)-180; return (a+d*u+360)%360; }
+
+function tick(ts){
+  if(!playing) return;
+  if(!last) last=ts;
+  const dt=(ts-last)/1000; last=ts;
+  const sp=+$("#speed").value;
+  t += dir*dt*sp*0.6;
+  if(t>6) t=-6; if(t<-6) t=6;
+  $("#scrub").value=Math.round(t*60);
+  paintClock(); pv.draw();
+  requestAnimationFrame(tick);
+}
+function paintClock(){
+  const sign=t<0?"\u2212":"+", a=Math.abs(t);
+  const hh=Math.floor(a), mm=Math.round((a-hh)*60);
+  $("#clkT").textContent=`HW ${sign}${hh}:${String(mm===60?0:mm).padStart(2,"0")}`;
+  const hw=$("#hwTime").value;
+  if(hw){
+    const d=new Date(new Date(hw).getTime()+t*3600e3);
+    $("#clkReal").textContent=d.toLocaleString("en-GB",{weekday:"short",hour:"2-digit",minute:"2-digit",day:"numeric",month:"short"});
+  } else $("#clkReal").textContent="set HW time below";
+}
+$("#scrub").addEventListener("input",e=>{ t=+e.target.value/60; paintClock(); pv.draw(); });
+$("#spring").addEventListener("input",()=>pv.draw());
+$("#hwTime").addEventListener("input",paintClock);
+$("#btnPlay").onclick=()=>{
+  playing=!playing; last=0;
+  $("#btnPlay").textContent=playing?"Pause":"Play";
+  if(playing) requestAnimationFrame(tick);
+};
+$("#btnDir").onclick=()=>{ dir=-dir; $("#btnDir").textContent=dir>0?"Reverse":"Forward"; };
+
+function legend(){
+  const g=$("#legendG"); g.replaceChildren();
+  const txt=(x,y,s)=>{ const e=el("text",{x,y,fill:"#4a626e","font-size":9,"font-family":"ui-monospace,monospace"}); e.textContent=s; g.appendChild(e); };
+  [0.5,1.5,3,5].forEach((r,i)=>{
+    const y=8+(i%2)*16, x=6+Math.floor(i/2)*66;
+    arrowPath(g,x,y,90,r,1); txt(x+34,y+3,r.toFixed(1));
+  });
+  overfallsMark(g,16,46,1,"overfalls"); txt(32,49,"overfalls");
+  arrowPath(g,78,46,90,1.6,1,{dash:true,colour:"#4a626e"}); txt(104,49,"eddy");
+}
+
+/* ============================ modes & wiring ============================ */
+function setMode(m){
+  mode=m;
+  document.body.className="mode-"+m;
+  document.querySelectorAll("[data-mode]").forEach(b=>b.setAttribute("aria-selected", b.dataset.mode===m));
+  if(m==="play"){ requestAnimationFrame(()=>{ pv.fit(); drawBase(pv); pv.draw(); legend(); paintClock(); }); }
+  else { requestAnimationFrame(()=>{ ed.fit(); drawBase(ed); ed.draw(); }); syncEntry(); }
+  $("#mapTitle").textContent = m==="stations" ? "Chart \u00b7 place stations" : "Chart \u00b7 set direction and rate";
+}
+document.querySelectorAll("[data-mode]").forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+document.querySelectorAll("[data-mzoom]").forEach(b=>b.onclick=()=>ed.zoomStep(+b.dataset.mzoom));
+document.querySelectorAll("[data-pzoom]").forEach(b=>b.onclick=()=>pv.zoomStep(+b.dataset.pzoom));
+$("#btnLabels").onclick=e=>{ showLabels=!showLabels; e.target.classList.toggle("on",!showLabels); ed.draw(); pv.draw(); };
+$("#btnPrevFrame").onclick=()=>{
+  const i=HOURS.indexOf(hour); if(i<=0) return;
+  const src=state.vals[hKey(HOURS[i-1])], dst=state.vals[hKey(hour)];
+  let n=0; for(const id in src){ if(!dst[id]){ dst[id]={...src[id]}; n++; } }
+  syncEntry(); ed.draw(); paintStrip(); save();
+};
+
+function refresh(){ loadScan(); paintStrip(); syncEntry(); ed.draw(); $("#caption").innerHTML=`<b>${hLab(hour)}</b> &nbsp; ${CAPTIONS[hKey(hour)]||""}`; }
+
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"&&e.key!=="["&&e.key!=="]") { if(e.key!=="Delete") return; }
+  if(e.key==="["){ const i=HOURS.indexOf(hour); if(i>0){hour=HOURS[i-1];refresh();} }
+  if(e.key==="]"){ const i=HOURS.indexOf(hour); if(i<12){hour=HOURS[i+1];refresh();} }
+  if(e.key==="Delete"&&mode==="values") setCur(null);
+  if(e.key===" "&&mode==="play"){ e.preventDefault(); $("#btnPlay").click(); }
+});
+
+/* notes + data dialogs */
+$("#notesBody").innerHTML = NOTES.map(([h,b])=>`<h4>${h}</h4><p>${b}</p>`).join("")
+  + `<h4>Source</h4><p style="color:#8ba1ad">Isle of Man Government tidal stream charts. All times refer to HW Liverpool. Not for navigation.</p>`;
+$("#btnNotes").onclick=()=>dlgNotes.showModal();
+$("#btnData").onclick=()=>{
+  const der=countDerived(), obs=observedRatio();
+  $("#dataStats").innerHTML =
+    `${state.stations.length} stations \u00b7 ${total()} of ${state.stations.length*13} values entered` +
+    `<br>${der} neap/spring figure${der===1?"":"s"} estimated at \u00d7${state.ratio} rather than read` +
+    (obs ? `<br>your own read pairs imply \u00d7${obs.median.toFixed(2)} (from ${obs.n} pair${obs.n===1?"":"s"}) ` +
+           `<button class="mini" id="btnUseObs">Use \u00d7${obs.median.toFixed(2)}</button>`
+         : `<br><span style="color:#8ba1ad">no read pairs yet to check that against</span>`);
+  const b=$("#btnUseObs");
+  if(b) b.onclick=()=>{
+    state.ratio=+obs.median.toFixed(2); reapplyRatio(); syncEntry(); ed.draw(); save();
+    $("#btnData").click();
+  };
+  $("#dataBox").value=""; dlgData.showModal();
+};
+$("#btnFill").onclick=()=>{ $("#dataBox").value=JSON.stringify(pack(),null,1); };
+$("#btnLoad").onclick=()=>{
+  try{ unpack(JSON.parse($("#dataBox").value)); sel=null; refresh(); dlgData.close(); save(); }
+  catch(err){ alert("Could not read that: "+err.message); }
+};
+$("#btnDownload").onclick=()=>{
+  const b=new Blob([JSON.stringify(pack(),null,1)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(b); a.download="manx-tidal-streams.json"; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+};
+
+window.addEventListener("resize",()=>{ ed.fit(); ed.draw(); pv.fit(); pv.draw(); fitScan(); });
+window.addEventListener("beforeunload",e=>{ if(total()>0){ e.preventDefault(); e.returnValue=""; } });
+
+/* ============================ boot ============================ */
+(async function(){
+  await restore();
+  drawBase(ed); ed.fit(); refresh(); setMode("stations");
+})();
+</script>
+</body>
+</html>

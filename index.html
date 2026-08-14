@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#eaf1f4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Manx Tides">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Manx Tidal Streams</title>
+<style>
+:root{
+  --sea:#eaf1f4; --paper:#f7fafb; --ink:#16242c; --ink-2:#4a626e; --ink-3:#8ba1ad;
+  --rule:#c3d4dc; --mag:#b0186f; --warn:#a8620d; --ok:#3f7d55;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overscroll-behavior:none}
+body{
+  background:var(--sea);color:var(--ink);font-family:var(--sans);
+  display:flex;flex-direction:column;overflow:hidden;
+  padding-top:var(--safe-t);padding-bottom:var(--safe-b);
+}
+button{font:inherit;color:inherit;cursor:pointer}
+
+header{padding:10px 16px 8px;background:var(--paper);border-bottom:1px solid var(--rule)}
+.row{display:flex;align-items:baseline;gap:8px}
+.eyebrow{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-3)}
+.status{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
+.dot.live{background:var(--ok)} .dot.est{background:var(--warn)} .dot.none{background:var(--mag)}
+.hw{font:600 34px/1.05 var(--mono);letter-spacing:-.02em;margin-top:2px}
+.hw small{font:400 13px/1 var(--sans);color:var(--ink-2);letter-spacing:.02em;margin-left:8px}
+.offset{font:600 15px/1.4 var(--sans);color:var(--mag);letter-spacing:.01em}
+.meta{font-size:11px;color:var(--ink-3);line-height:1.5;margin-top:3px}
+
+#stage{flex:1;position:relative;overflow:hidden;background:#e2e9ec;touch-action:none}
+#chart{position:absolute;transform-origin:0 0;user-select:none;-webkit-user-drag:none}
+#peek{
+  position:absolute;left:50%;transform:translateX(-50%);top:10px;display:none;
+  background:var(--ink);color:var(--paper);border:0;border-radius:999px;padding:7px 16px;
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 2px 10px rgba(22,36,44,.3);
+}
+#peek.on{display:block}
+
+.caption{padding:8px 16px;background:#fffdf5;border-top:1px solid var(--rule);font-size:11.5px;line-height:1.5;color:var(--ink-2)}
+.strip{display:flex;background:var(--paper);border-top:1px solid var(--rule);overflow-x:auto;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.strip button{
+  flex:1 0 auto;min-width:44px;background:none;border:0;border-right:1px solid var(--rule);
+  padding:9px 2px;font:600 12px/1 var(--mono);color:var(--ink-2);
+}
+.strip button:last-child{border-right:0}
+.strip button[aria-current=true]{background:var(--mag);color:#fff}
+.strip button.now{box-shadow:inset 0 -3px 0 var(--ink)}
+
+dialog{border:1px solid var(--ink);border-radius:4px;padding:0;width:92%;max-width:420px;background:var(--paper);color:var(--ink)}
+dialog::backdrop{background:rgba(22,36,44,.55)}
+.dlg-h{padding:12px 16px;border-bottom:1px solid var(--rule);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
+.dlg-b{padding:16px;font-size:13px;line-height:1.6}
+.dlg-b label{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+.dlg-b input{width:100%;padding:9px;border:1px solid var(--rule);border-radius:3px;font:15px var(--mono);background:#fff;color:var(--ink)}
+.dlg-f{padding:10px 16px;border-top:1px solid var(--rule);display:flex;gap:8px;justify-content:flex-end}
+.btn{background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:3px;padding:8px 14px;font-size:11px;letter-spacing:.14em;text-transform:uppercase}
+.btn.ghost{background:none;color:var(--ink-2);border-color:var(--rule)}
+.tap{background:none;border:0;padding:0;color:var(--ink-3);text-decoration:underline;font-size:11px}
+:focus-visible{outline:2px solid var(--mag);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row">
+    <span class="eyebrow">High water Liverpool</span>
+    <span class="status"><span class="dot" id="dot"></span><span id="src">loading</span></span>
+  </div>
+  <div class="hw"><span id="hwTime">--:--</span><small id="hwDay"></small></div>
+  <div class="offset" id="offset">&nbsp;</div>
+  <div class="meta" id="meta">&nbsp;</div>
+</header>
+
+<div id="stage">
+  <img id="chart" alt="Tidal stream chart for the current hour">
+  <button id="peek">Back to now</button>
+</div>
+
+<div class="caption" id="caption"></div>
+<nav class="strip" id="strip" aria-label="Hours relative to high water"></nav>
+
+<dialog id="dlg">
+  <div class="dlg-h">Set high water manually</div>
+  <div class="dlg-b">
+    <p style="margin:0 0 12px;color:var(--ink-3)">Used when the tide file is missing or out of date. Enter the next or most recent HW at <strong>Liverpool</strong>, in your local time.</p>
+    <label for="manual">High water, Liverpool</label>
+    <input type="datetime-local" id="manual">
+  </div>
+  <div class="dlg-f">
+    <button class="btn ghost" id="clearManual">Clear</button>
+    <button class="btn ghost" onclick="dlg.close()">Cancel</button>
+    <button class="btn" id="saveManual">Use this</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+const SCANS = {
+"-6": "panels/hw-06.jpg",
+"-5": "panels/hw-05.jpg",
+"-4": "panels/hw-04.jpg",
+"-3": "panels/hw-03.jpg",
+"-2": "panels/hw-02.jpg",
+"-1": "panels/hw-01.jpg",
+"+0": "panels/hw+00.jpg",
+"+1": "panels/hw+01.jpg",
+"+2": "panels/hw+02.jpg",
+"+3": "panels/hw+03.jpg",
+"+4": "panels/hw+04.jpg",
+"+5": "panels/hw+05.jpg",
+"+6": "panels/hw+06.jpg"
+};
+const HOURS = [-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6];
+const hKey = h => (h<0?"-":"+") + String(Math.abs(h));
+const LUNAR_MS = 12.4206012 * 3600e3;         /* mean interval between successive high waters */
+
+/* Liverpool mean ranges, used only to describe the tide as nearer springs or neaps.
+   Approximate: adjust if you want it sharper. */
+const NEAP_RANGE = 4.3, SPRING_RANGE = 8.4;
+
+const CAPTIONS = {
+"-6": "Streams beginning off SE & NW coasts, strengthening off Point of Ayre, S of Contrary Head and through Calf Sound.",
+"-5": "Streams strengthening all round the Island. Calf Sound almost at maximum; eddies begin at Chicken Rock & Langness.",
+"-4": "Streams turning in Ramsey Bay and off the SE coast. Overfalls & race E of the Chickens and off Langness. Calf Sound stream weakening. Streams NE of Point of Ayre near maximum.",
+"-3": "Streams at maximum between the Chickens & Langness, with overfalls & race at both. Eddy along the SE coast. Overfalls off Point of Ayre.",
+"-2": "Calf Sound almost slack. Overfalls E of the Chickens and off Langness. Overfalls or race at Ayre Hook.",
+"-1": "Streams off the W coast and through Calf Sound now N-bound. Overfalls off the Chickens, Langness and Ayre Hook. Streams S of Point of Ayre now slackening quickly.",
+"+0": "Offshore streams are turning and weak, except in the NE. Stream in Calf Sound gaining strength.",
+"+1": "Overfalls at springs N of the Chickens and S of Langness. Calf Sound nearing maximum. Race off Point of Ayre.",
+"+2": "Overfalls off Langness and N of the Chickens. Race off Point of Ayre. Streams off the NE coast and Niarbyl at maximum.",
+"+3": "Streams at maximum off the Chickens & Langness, with overfalls. Race off Point of Ayre. Streams at maximum off the E & NW coasts. Calf Sound becomes slack.",
+"+4": "Race or overfalls at Point of Ayre. Overfalls off the Chickens & Langness.",
+"+5": "Streams slack in Ramsey Bay and off Maughold Head. Stream strengthening in Calf Sound.",
+"+6": "Streams turning from Point of Ayre to Peel and offshore in the S. A southerly stream has begun in Ramsey Bay."
+};
+
+const $ = s => document.querySelector(s);
+let tides = null;        /* parsed tides.json */
+let manualHW = null;     /* Date, session only */
+let peekHour = null;     /* non-null while browsing another hour */
+let peekTimer = null;
+
+/* ---------- tide source ---------- */
+async function loadTides(){
+  try{
+    const r = await fetch("tides.json", {cache:"no-cache"});
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    if(!d || !Array.isArray(d.events) || !d.events.length) throw new Error("empty");
+    tides = d;
+  }catch(e){ tides = null; }
+}
+
+/* nearest high water to a given moment, and how we know it */
+function nearestHW(now){
+  if(manualHW){
+    /* step the manual time to whichever HW is closest to now */
+    const k = Math.round((now - manualHW) / LUNAR_MS);
+    return {hw:new Date(+manualHW + k*LUNAR_MS), src:"manual", exact:k===0};
+  }
+  if(tides){
+    const highs = tides.events.filter(e => e.type === "H").map(e => ({t:new Date(e.t), h:e.h}));
+    if(highs.length){
+      let best = null;
+      for(const x of highs){
+        const d = Math.abs(x.t - now);
+        if(!best || d < best.d) best = {d, ...x};
+      }
+      /* inside the file's coverage if the nearest event is within about half a tidal cycle */
+      if(best.d <= LUNAR_MS*0.55) return {hw:best.t, height:best.h, src:"file", exact:true};
+      /* past the end of the file: extrapolate, and say so */
+      const last = highs[highs.length-1];
+      const k = Math.round((now - last.t) / LUNAR_MS);
+      return {hw:new Date(+last.t + k*LUNAR_MS), src:"estimated", exact:false};
+    }
+  }
+  return null;
+}
+
+/* range of the tide around this high water, for the springs/neaps hint */
+function rangeAt(hw){
+  if(!tides) return null;
+  const lows = tides.events.filter(e => e.type === "L" && e.h != null);
+  const high = tides.events.find(e => e.type === "H" && Math.abs(new Date(e.t) - hw) < 60e3);
+  if(!high || high.h == null || !lows.length) return null;
+  let near = null;
+  for(const l of lows){
+    const d = Math.abs(new Date(l.t) - hw);
+    if(!near || d < near.d) near = {d, h:l.h};
+  }
+  if(!near || near.d > LUNAR_MS) return null;
+  return high.h - near.h;
+}
+
+/* ---------- rendering ---------- */
+const fmtTime = d => d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+const fmtDay  = d => {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const that  = new Date(d); that.setHours(0,0,0,0);
+  const days = Math.round((that-today)/864e5);
+  if(days === 0) return "today";
+  if(days === 1) return "tomorrow";
+  if(days === -1) return "yesterday";
+  return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short"});
+};
+
+function render(){
+  const now = new Date();
+  const s = nearestHW(now);
+
+  if(!s){
+    $("#dot").className = "dot none";
+    $("#src").textContent = "no tide data";
+    $("#hwTime").textContent = "--:--";
+    $("#hwDay").textContent = "";
+    $("#offset").innerHTML = '<button class="tap" id="openManual">Tap to enter high water manually</button>';
+    $("#meta").textContent = "";
+    $("#openManual").onclick = openManual;
+    showHour(0, true);
+    return;
+  }
+
+  const t = (now - s.hw) / 3600e3;                     /* hours from HW, roughly -6.2 to +6.2 */
+  const clamped = Math.max(-6, Math.min(6, t));
+  const hour = Math.round(clamped);
+
+  $("#dot").className = "dot " + (s.src === "file" ? "live" : s.src === "manual" ? "est" : "est");
+  $("#src").textContent = s.src === "file" ? "tide file" : s.src === "manual" ? "manual" : "estimated";
+  $("#hwTime").textContent = fmtTime(s.hw);
+  $("#hwDay").textContent = fmtDay(s.hw);
+
+  const sign = t < 0 ? "\u2212" : "+";
+  const a = Math.abs(t), hh = Math.floor(a), mm = Math.round((a - hh) * 60);
+  $("#offset").textContent = `now HW ${sign}${hh}:${String(mm === 60 ? 0 : mm).padStart(2,"0")}`;
+
+  const bits = [];
+  const rng = rangeAt(s.hw);
+  if(rng != null){
+    const f = (rng - NEAP_RANGE) / (SPRING_RANGE - NEAP_RANGE);
+    const word = f > 0.75 ? "near springs" : f > 0.5 ? "towards springs" : f > 0.25 ? "towards neaps" : "near neaps";
+    bits.push(`range ${rng.toFixed(1)} m \u00b7 ${word}`);
+  }
+  if(tides && tides.generated){
+    const age = Math.round((now - new Date(tides.generated)) / 864e5);
+    bits.push(age <= 0 ? "updated today" : `updated ${age} day${age===1?"":"s"} ago`);
+  }
+  if(s.src === "estimated") bits.push("beyond the tide file, extrapolated");
+  if(s.src === "manual") bits.push("manual override \u2014 tap to change");
+  $("#meta").innerHTML = bits.join(" \u00b7 ") + ' <button class="tap" id="openManual">set HW</button>';
+  $("#openManual").onclick = openManual;
+
+  if(peekHour === null) showHour(hour, true);
+  else markStrip(hour);
+}
+
+let currentHour = null, nowHour = null;
+function showHour(h, isNow){
+  if(isNow) nowHour = h;
+  if(currentHour !== h){
+    currentHour = h;
+    $("#chart").src = SCANS[hKey(h)];
+    $("#caption").textContent = CAPTIONS[hKey(h)] || "";
+  }
+  markStrip(nowHour);
+  $("#peek").classList.toggle("on", peekHour !== null);
+}
+function markStrip(nh){
+  [...$("#strip").children].forEach((b,i) => {
+    b.setAttribute("aria-current", HOURS[i] === currentHour);
+    b.classList.toggle("now", HOURS[i] === nh);
+  });
+}
+
+/* ---------- hour strip ---------- */
+HOURS.forEach(h => {
+  const b = document.createElement("button");
+  b.textContent = (h < 0 ? "\u2212" : "+") + Math.abs(h);
+  b.setAttribute("aria-label", `High water ${h<0?"minus":"plus"} ${Math.abs(h)} hours`);
+  b.onclick = () => {
+    peekHour = h;
+    showHour(h, false);
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(backToNow, 90e3);      /* drift back on its own if left alone */
+  };
+  $("#strip").appendChild(b);
+});
+function backToNow(){ peekHour = null; clearTimeout(peekTimer); render(); }
+$("#peek").onclick = backToNow;
+
+/* ---------- pinch and pan on the chart ---------- */
+const view = {z:1, x:0, y:0, nat:[1,1]};
+function fitChart(){
+  const r = $("#stage").getBoundingClientRect();
+  if(!view.nat[0]) return;
+  view.z = Math.min(r.width / view.nat[0], r.height / view.nat[1]);
+  view.x = (r.width - view.nat[0]*view.z)/2;
+  view.y = (r.height - view.nat[1]*view.z)/2;
+  applyChart();
+}
+function applyChart(){ $("#chart").style.transform = `translate(${view.x}px,${view.y}px) scale(${view.z})`; }
+$("#chart").addEventListener("load", () => {
+  view.nat = [$("#chart").naturalWidth, $("#chart").naturalHeight];
+  fitChart();
+});
+(function(){
+  const stage = $("#stage"), pts = new Map();
+  let pan = null, pd = 0, fitZ = 0;
+  const zoomAt = (cx, cy, f) => {
+    if(!fitZ) fitZ = view.z;
+    const nz = Math.max(fitZ*0.9, Math.min(fitZ*12, view.z*f));
+    view.x = cx - (cx - view.x)*(nz/view.z);
+    view.y = cy - (cy - view.y)*(nz/view.z);
+    view.z = nz; applyChart();
+  };
+  stage.addEventListener("pointerdown", e => {
+    if(e.target.id === "peek") return;
+    if(e.isPrimary) pts.clear();
+    pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pts.size === 1) pan = {x:e.clientX, y:e.clientY, ox:view.x, oy:view.y};
+    stage.setPointerCapture(e.pointerId);
+  });
+  stage.addEventListener("pointermove", e => {
+    if(!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pts.size === 2){
+      pan = null;
+      const [a,b] = [...pts.values()], d = Math.hypot(a.x-b.x, a.y-b.y);
+      const r = stage.getBoundingClientRect();
+      if(pd > 0) zoomAt((a.x+b.x)/2 - r.left, (a.y+b.y)/2 - r.top, d/pd);
+      pd = d;
+    } else if(pan){
+      view.x = pan.ox + (e.clientX - pan.x);
+      view.y = pan.oy + (e.clientY - pan.y);
+      applyChart();
+    }
+  });
+  const drop = e => { pts.delete(e.pointerId); if(pts.size < 2) pd = 0; if(!pts.size) pan = null; };
+  stage.addEventListener("pointerup", drop);
+  stage.addEventListener("pointercancel", drop);
+  window.addEventListener("pointerup", drop);
+  stage.addEventListener("dblclick", e => {
+    const r = stage.getBoundingClientRect();
+    if(fitZ && view.z > fitZ*1.2) fitChart();
+    else zoomAt(e.clientX - r.left, e.clientY - r.top, 2.5);
+  });
+  window.addEventListener("resize", () => { fitZ = 0; fitChart(); });
+})();
+
+/* ---------- manual high water ---------- */
+function openManual(){
+  const s = nearestHW(new Date());
+  if(s){
+    const d = new Date(+s.hw - s.hw.getTimezoneOffset()*60e3);
+    $("#manual").value = d.toISOString().slice(0,16);
+  }
+  dlg.showModal();
+}
+$("#saveManual").onclick = () => {
+  const v = $("#manual").value;
+  if(v){ manualHW = new Date(v); dlg.close(); render(); }
+};
+$("#clearManual").onclick = () => { manualHW = null; dlg.close(); render(); };
+
+/* ---------- boot ---------- */
+(async function(){
+  await loadTides();
+  render();
+  setInterval(render, 20e3);
+  document.addEventListener("visibilitychange", () => { if(!document.hidden){ loadTides().then(render); } });
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>

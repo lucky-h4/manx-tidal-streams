@@ -1,0 +1,11 @@
+{
+ "station": {
+  "id": "0451",
+  "name": "Liverpool (Gladstone Dock)"
+ },
+ "reference": "All chart hours are relative to high water at this station.",
+ "source": "placeholder - replace by running the Refresh tide times workflow",
+ "generated": "1970-01-01T00:00:00.000Z",
+ "placeholder": true,
+ "events": []
+}

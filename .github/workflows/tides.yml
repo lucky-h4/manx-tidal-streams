@@ -1,0 +1,42 @@
+name: Refresh tide times
+
+on:
+  schedule:
+    - cron: "20 4 * * *"      # daily, 04:20 UTC. The Discovery tier only covers 7 days.
+  workflow_dispatch:           # and a manual "Run workflow" button
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tides
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch tide events
+        env:
+          ADMIRALTY_KEY: ${{ secrets.ADMIRALTY_KEY }}
+          STATION_ID: ${{ vars.STATION_ID || '0451' }}
+          STATION_NAME: ${{ vars.STATION_NAME || 'Liverpool (Gladstone Dock)' }}
+        run: node scripts/fetch-tides.mjs
+
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- tides.json; then
+            echo "No change."
+            exit 0
+          fi
+          git config user.name  "tide-bot"
+          git config user.email "tide-bot@users.noreply.github.com"
+          git add tides.json
+          git commit -m "Tide times refreshed $(date -u +%Y-%m-%d)"
+          git push
